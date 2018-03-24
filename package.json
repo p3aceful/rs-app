@@ -1,0 +1,18 @@
+{
+  "name": "runescape-app",
+  "version": "1.0.0",
+  "description": "This is a little app working with the runescape API to track player stats",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodemon ./server/server.js"
+  },
+  "author": "Fredrik Carlsen",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.16.3",
+    "mongodb": "^3.0.5"
+  },
+  "devDependencies": {
+    "nodemon": "^1.17.2"
+  }
+}
