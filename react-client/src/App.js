@@ -27,23 +27,72 @@ class App extends Component {
 
     sendServerRequest(name) {
         console.log('Sending server request with', name);
-        fetch('http://localhost:5000/api/test/' + name + '?period=7')
+        fetch('http://localhost:5000/api/player-progress/' + name + '?period=31')
             .then(response => {
                 if (response.status === 200) {
 
                     console.log('Got a response and status was ok');
 
-                    response.json().then(json => {
-                        this.setState({ name, request: { initiated: false, resolved: true, success: true, data: json, errMsg: null } })
-                    });
+
+                    response.json()
+                        .then(json => {
+                            console.log(json);
+                            this.setState(
+                                {
+                                    name,
+                                    request: {
+                                        initiated: false,
+                                        resolved: true,
+                                        success: true,
+                                        data: json,
+                                        errMsg: null
+                                    }
+                                }
+                            );
+                        });
                 }
                 else {
 
                     console.log('Got a response and status was NOT ok');
 
-                    response.text().then(text => this.setState({ name, request: { initiated: false, resolved: true, success: false, errMsg: text, data: null } }));
+                    response.text().then(text => {
+                        this.setState(
+                            {
+                                name,
+                                request: {
+                                    initiated: false,
+                                    resolved: true,
+                                    success: false,
+                                    errMsg: text,
+                                    data: null
+                                }
+                            }
+                        );
+                        console.log(this.state.errMsg);
+                    });
                 }
             });
+    }
+
+    updateRequest() {
+        const name = this.state.name;
+        console.log('test');
+        const http = new XMLHttpRequest({mozSystem: true});
+        const url = 'http://localhost:5000/api/player-put/' + name;
+        http.open('PUT', url, true);
+        http.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+
+        const self = this;
+        http.onreadystatechange = function () {
+            if (http.readyState === 4 && http.status === 200) {
+                self.sendServerRequest(name);
+            }
+        }
+        http.send();
+
+        // res.header("Access-Control-Allow-Origin", "*");
+        // res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+        // next();
     }
 
     render() {
@@ -55,7 +104,7 @@ class App extends Component {
                     </h1>
                 </header>
                 <SearchForm passAlong={(name) => this.handleFormChange(name)} />
-                <Player request={this.state.request} />
+                <Player request={this.state.request} updateRequest={() => this.updateRequest()} />
             </div>
         );
     }
@@ -83,7 +132,7 @@ class SearchForm extends Component {
         return (
             <form onSubmit={this.handleSubmit}>
                 <input type="text" value={this.state.value} onChange={this.handleChange} placeholder={'Give me a name'} />
-                <input type="submit" value="Submit"></input>
+                <input type="submit" value="Search"></input>
             </form>
         );
     }
@@ -103,10 +152,15 @@ class Player extends Component {
         }
         else {
             if (this.props.request.success) {
-                return (<SkillTable skills={this.props.request.data} />);
+                return (
+                    <div>
+                        <SkillTable skills={this.props.request.data} />
+                        <a onClick={this.props.updateRequest}>Click to update</a>
+                    </div>
+                );
             }
             else {
-                return (<p className="status-msg">Ooopsie: {this.props.request.errMsg}</p>);
+                return (<p className="status-msg">{this.props.request.errMsg}</p>);
             }
         }
     }

@@ -1,57 +1,43 @@
-const verbose = false;
+const getRelevantDatapoints = (data, timePeriod, date, comparator) => {
+    const millis = date.getMilliseconds();
 
-const processData = function (data, timePeriod) {
-    return new Promise((resolve, reject) => {
-        const now = new Date();
-        const timePeriodMillis = timePeriod * 24 * 60 * 60 * 1000;
-
-        const datapointsWithinTimePeriod = data.filter(datapoint => {
-            return datapoint.date > now - timePeriodMillis;
-        });
-
-        const datapointsOutsideTimePeriod = data.filter(datapoint => {
-            return datapoint.date < now - timePeriodMillis;
-        });
-
-        if (verbose) {
-            datapointsWithinTimePeriod.forEach(point => {
-                console.log('Within:', point.date);
-            });
-            datapointsOutsideTimePeriod.forEach(point => {
-                console.log('Outside:', point.date);
-            });
-        }
-
-        if (datapointsWithinTimePeriod.length + datapointsOutsideTimePeriod.length === 0) {
-            reject('This site has literally no data on this player.');
-            return;
-        }
-        else if (!datapointsWithinTimePeriod.length) {
-            reject('No datapoints within this period found.');
-            return;
-        }
-        else if (datapointsWithinTimePeriod.length + datapointsOutsideTimePeriod.length < 2) {
-            reject('Not enough datapoints to process');
-            return;
-        }
-        else if (datapointsOutsideTimePeriod.length === 0) {
-            // Calc stoof
-            const first = datapointsWithinTimePeriod.shift();
-            const last = datapointsWithinTimePeriod.pop();
-            const diff = difference(first.skills, last.skills)
-            resolve(diff);
-        }
-        else {
-            // Calc stoooffs
-            const first = datapointsOutsideTimePeriod.pop();
-            const last = datapointsWithinTimePeriod.pop();
-            const diff = difference(first.skills, last.skills)
-            resolve(diff);
-        }
+    const relevantDatapoints = data.datapoints.filter(datapoint => {
+        return comparator(datapoint.date, now - millis);
     });
+    return relevantDatapoints;
 }
 
-const difference = function calculateDifferenceBetweenDatapoints(first, last) {
+const lt = (a, b) => {
+    return a < b;
+}
+
+const gt = (a, b) => {
+    return a > b;
+}
+
+const calculateProgress = function (data, timePeriod) {
+    const now = new Date();
+
+    const within = getRelevantDatapoints(data, timePeriod, now, gt);
+    const outside = getRelevantDatapoints(data, timePeriod, now, lt);
+
+    if (datapointsOutsideTimePeriod.length === 0) {
+        // Calc stoof
+        const first = datapointsWithinTimePeriod.shift();
+        const last = datapointsWithinTimePeriod.pop();
+        const diff = difference(first.skills, last.skills)
+        return diff;
+    }
+    else {
+        // Calc stoooffs
+        const first = datapointsOutsideTimePeriod.pop();
+        const last = datapointsWithinTimePeriod.pop();
+        const diff = difference(first.skills, last.skills)
+        return diff;
+    }
+}
+
+const difference = (first, last) => {
     let mutable = JSON.parse(JSON.stringify(last));
 
     for (const key in last) {
@@ -62,4 +48,15 @@ const difference = function calculateDifferenceBetweenDatapoints(first, last) {
     return mutable;
 }
 
-module.exports.process = processData;
+const hasDatapoints = (data) => {
+    return data.datapoints.length > 1;
+}
+
+const hasDatapointsWithinPeriod = (data, period, date) => {
+    const result = hasDatapointsWithinPeriod(data, period, date, gt);
+    return result.length !== 0;
+}
+
+module.exports.calculateProgress = calculateProgress;
+module.exports.hasDatapointsWithinPeriod = hasDatapointsWithinPeriod;
+module.exports.hasDatapoints = hasDatapoints;
