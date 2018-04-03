@@ -1,62 +1,7 @@
-.App * {
-    margin: 0;
-}
-
-.App {
-    padding: 0;
-    margin: 0;
-}
-
-.App header {
-    /* background-color: #225; */
-    padding: 2em;
-    padding-top: 1em;
-    padding-bottom: 1em;
-}
-
-.App header h1 {
-    /* color: white; */
-}
-
-.App form {
-    padding: 2em;
-    padding-top: 1em;
-    padding-bottom: 1em;
-}
-
-.App table {
-    margin: 2em;
-    margin-top: 0;
-    margin-bottom: 0;
-    border: 1px solid black;
-    /* background-color: #225; */
-    /* color: white; */
-}
-.App table tbody td {
-    /* border: 1px solid #449; */
-    padding-right: 1em;
-    padding-left: .5em;
-    min-width: 2em;
-}
-
-.App a {
-    margin: 2em;
-}
-
-.App a:hover {
-    color:red;
-    cursor: pointer;
-    text-decoration: underline;
-}
-
-.status-msg {
-    padding: 2em;
+.green {
+    color: green;
 }
 
 .red {
     color: red;
-}
-
-.green {
-    color: green;
 }

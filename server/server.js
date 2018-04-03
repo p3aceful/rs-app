@@ -1,5 +1,5 @@
 const Mongo = require('./MongoHandler.js');
-const DataProcessor = require('./DataProcessor.js');
+const ProgressCalculator = require('./ProgressCalculator.js');
 const RuneScape = require('./runescapeApiRequests.js');
 const express = require('express');
 
@@ -15,94 +15,108 @@ app.use((req, res, next) => {
     next();
 });
 
+
 Mongo.connect(serverURL)
     .then(conn => {
 
         app.get('/api/player/:name', async (req, res) => {
             try {
                 const playerName = trimText(req.params.name);
-
-                console.log(`GET request for player: ${playerName}`);
+                const query = req.query;
+                const now = new Date();
 
                 const result = await Mongo.getPlayerData(playerName, conn);
-                res.json(result);
-            } catch (error) {
-                res.status(404);
-                res.send('Player does not exists in database.');
-            }
-        });
 
-        app.put('/api/player/:name', async (req, res) => {
-            try {
-                const playerName = trimText(req.params.name);
-
-                console.log(`A request to update an entry :: ${playerName}:: has been made`);
-                
-                const [fromDb, fromHiscores] = await Promise.all(
-                    [Mongo.getPlayerData(playerName, conn), RuneScape.lookup(playerName)]
-                );
-
-                if (fromDb === null || fromHiscores === null) {
-                    res.status(404);
-                    console.log('Update was NOT ok!');
-                    res.send('Player does not exist in database');
+                if (result === null) {
+                    const msg = createResponseMessage('Player was not found in database.');
+                    res.status(400);
+                    res.json(msg);
                     return;
                 }
 
-                const entry = appendDatapointToExistingPlayerFromDB(fromDb, fromHiscores);
+                if (query.period === undefined) {
+                    // Send plain entry for this player
+                    const msg = createResponseMessage('OK', result);
+                    res.json(msg);
+                    return;
 
-                const result = await Mongo.updatePlayerEntry(playerName, entry, conn);
+                } else if (isNaN(query.period)) {
+                    const msg = createResponseMessage('Unrecognized token in period.');
+                    res.status(400);
+                    res.json(msg);
+                } else {
 
-                res.json(result);
-                console.log(`Update was ok!`);
+                    if (!ProgressCalculator.hasDatapoints(result)) {
+                        const msg = createResponseMessage('This player does not have enough datapoints to process.');
+                        res.status(400);
+                        res.json(msg);
+                        return;
+                    }
+
+                    console.log('Checking if player has enough datapoints within the period to process:');
+                    if (!ProgressCalculator.hasDatapointsWithinPeriod(result, query.period, now)) {
+                        const msg = createResponseMessage('This player does not have enough datapoints in this period to process');
+                        res.status(400);
+                        res.json(msg);
+                        return;
+                    }
+                    console.log('It did!');
+
+                    const progress = ProgressCalculator.calculateProgress(result, query.period);
+                    const msg = createResponseMessage('OK', progress);
+                    res.json(msg);
+                    return;
+
+                }
             } catch (error) {
-                console.log('Caught error in PUT-handler:', error);
-                res.send(error.toString());
+                console.log(error);
+                res.status(500);
+                const msg = createResponseMessage('Server error');
+                res.json(msg);
             }
         });
 
         app.post('/api/player/:name', async (req, res) => {
             try {
                 const playerName = trimText(req.params.name);
-                console.log(`A request to start tracking user :: ${playerName} :: was made.`);
 
-                const fromHiscores = await RuneScape.lookup(playerName);
+                const [fromDb, fromHiscores] = await Promise.all(
+                    [Mongo.getPlayerData(playerName, conn), RuneScape.lookup(playerName)]
+                );
 
                 if (fromHiscores === null) {
-                    res.status(404);
-                    console.log('The player does not exist in runescape');
-                    res.send('The player does not exist in runescape')
+                    const msg = createResponseMessage('Player does not exist');
+                    res.status(400);
+                    res.json(msg);
                     return;
                 }
 
-                const entry = createNewEntry(playerName, fromHiscores);
+                if (fromDb === null) {
+                    // Player not exist, make a new.
+                    const entry = createNewEntry(playerName, fromHiscores);
+                    const result = await Mongo.insertNewPlayer(playerName, entry, conn);
 
-                const result = await Mongo.insertNewPlayer(playerName, entry, conn);
+                    const msg = createResponseMessage('Started tracking player: ' + playerName, entry);
+                    res.json(msg);
+                    return;
+                }
+                else {
+                    // Player exists, append new datapoint.
+                    const appended = appendDatapointToExistingPlayerFromDB(fromDb, fromHiscores);
 
-                res.send(result);
-                console.log('Request was ok!');
+                    const result = await Mongo.updatePlayerEntry(playerName, appended, conn);
+
+                    const responseData = await Mongo.getPlayerData(playerName, conn); // ???
+
+                    const msg = createResponseMessage('Added 1 datapoint to player: ' + playerName, responseData);
+                    res.json(msg);
+                    return;
+                }
             } catch (error) {
-                res.status(404);
-                console.log('OOPSIEE');
-                res.send('Player already exist in database.')
-            }
-        });
-
-        app.get('/api/player-progress/:name', async (req, res) => {
-            try {
-                const playerName = trimText(req.params.name);
-                const period = req.query.period;
-                console.log(`GET request for the progress of player :: ${playerName} ::`);
-
-                const result = await Mongo.getPlayerData(playerName, conn);
-
-                if (result === null) throw new Error('Ooopsie, that player is not tracked!');
-
-                const processed = DataProcessor.process(result, period);
-                res.json(processed);
-            } catch (error) {
-                res.status(404);
-                res.send(error.toString());
+                console.log(error);
+                const msg = createResponseMessage('Server error');
+                res.status(500);
+                res.json(msg);
             }
         });
 
@@ -114,6 +128,12 @@ Mongo.connect(serverURL)
         process.exit();
     });
 
+const createResponseMessage = (msg, data = {}) => {
+    return {
+        msg,
+        data,
+    }
+}
 const trimText = text => {
     let modified = text.replace(/\s/g, '_');
     modified = modified.toLowerCase();
@@ -129,7 +149,6 @@ const createNewEntry = (playerName, datapoint) => {
 const appendDatapointToExistingPlayerFromDB = (playerEntryFromDb, datapointSkills) => {
     const now = new Date();
     const datapoints = playerEntryFromDb.datapoints || [];
-    console.log(datapoints);
     const datapoint = { date: now, skills: datapointSkills };
     datapoints.push(datapoint);
     return datapoints;

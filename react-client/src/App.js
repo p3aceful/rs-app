@@ -5,114 +5,198 @@ import './App.css';
 class App extends Component {
 
     constructor() {
-        super()
+        super();
         this.state = {
-            name: null,
-            request: {
-                initiated: false,
-                resolved: false,
+            status: {
+                start: true,
+                pending: false,
                 success: false,
                 data: null,
-                errMsg: null,
+                msg: 'Welcome to chili\'s',
+                name: undefined,
+                days: undefined,
             }
         }
     }
 
-    handleFormChange(name) {
-        console.log('Now we got a handleFormChange with arg', name);
+    sendUpdateRequest() {
 
-        this.setState({ name: name, request: { initiated: true, resolved: false, success: false, data: null, errMsg: null } });
+        this.setState({
+            status: {
+                start: false,
+                pending: true,
+                success: false,
+                data: null,
+                msg: 'Welcome to chili\'s',
+                name: this.state.status.name,
+                days: -1,
+            }
+        });
+
+        fetch(`http://localhost:5000/api/player/${this.state.status.name}`, {method: 'POST'})
+            .then(res => res.json())
+            .then(json => {
+                this.changeDay(7);
+            })
+    }
+    
+    changeDay(number) {
+
+        if (number === 0) {
+            this.sendUpdateRequest();
+            return;
+        }
+
+        if (number === this.state.status.days) {
+            console.log('already showing days:', number);
+            return;
+        }
+        
+        this.setState({
+            status: {
+                start: false,
+                pending: true,
+                success: false,
+                data: null,
+                msg: 'Fetchign data',
+                name: this.state.status.name,
+                days: number,
+            }
+        })
+
+        console.log('Someone wants to change the day??');
+        console.log('Fetching', this.state.status);
+        fetch(`http://localhost:5000/api/player/${this.state.status.name}?period=${number}`)
+            .then(response => {
+                response.json()
+                    .then(json => {
+                        this.setState({
+                            status: {
+                                start: false,
+                                pending: false,
+                                success:true,
+                                data: json.data,
+                                msg: json.msg,
+                                name: this.state.status.name,
+                                days: this.state.status.days,
+                            }
+                        })
+                    })
+            })
+        
+    }
+
+    handleFormSubmit(name) {
+        this.setState({
+            status: {
+                start: false,
+                pending: true,
+                success: false,
+                data: null,
+                msg: '',
+                name: name,
+                days: undefined,
+            }
+        });
+
         this.sendServerRequest(name);
     }
 
     sendServerRequest(name) {
-        console.log('Sending server request with', name);
-        fetch('http://localhost:5000/api/player-progress/' + name + '?period=31')
+
+        fetch('http://localhost:5000/api/player/' + name + '?period=7')
             .then(response => {
-                if (response.status === 200) {
 
-                    console.log('Got a response and status was ok');
 
+                if (response.status === 400 || response.status === 404) {
+                    console.log('The response status was 400');
+                    response.json()
+                        .then(json => {
+                            this.setState({
+                                status: {
+                                    start: false,
+                                    pending: false,
+                                    success: false,
+                                    data: null,
+                                    msg: json.msg,
+                                    name: undefined,
+                                    days: undefined,
+                                }
+                            });
+                        })
+
+                } else if (response.status === 500) {
+                    console.log('The response status was 500');
+                    response.json()
+                        .then(json => {
+                            this.setState({
+                                status: {
+                                    start: false,
+                                    pending: false,
+                                    success: false,
+                                    data: null,
+                                    msg: json.msg,
+                                    name: undefined,
+                                    days: undefined,
+                                },
+                            });
+                        })
+                } else {
+                    console.log(response.status);
 
                     response.json()
                         .then(json => {
-                            console.log(json);
-                            this.setState(
-                                {
-                                    name,
-                                    request: {
-                                        initiated: false,
-                                        resolved: true,
-                                        success: true,
-                                        data: json,
-                                        errMsg: null
-                                    }
+                            // FAKE DELAY
+                            return new Promise(resolve => {
+                                setTimeout(resolve, 2000, json);
+                            });
+                        })
+                        .then(json => {
+
+                            this.setState({
+                                status: {
+                                    start: false,
+                                    pending: false,
+                                    success: true,
+                                    data: json.data,
+                                    msg: json.msg,
+                                    name: this.state.status.name,
+                                    days: 7,
                                 }
-                            );
+                            });
                         });
                 }
-                else {
-
-                    console.log('Got a response and status was NOT ok');
-
-                    response.text().then(text => {
-                        this.setState(
-                            {
-                                name,
-                                request: {
-                                    initiated: false,
-                                    resolved: true,
-                                    success: false,
-                                    errMsg: text,
-                                    data: null
-                                }
-                            }
-                        );
-                        console.log(this.state.errMsg);
-                    });
-                }
+            })
+            .catch(err => {
+                console.log('Could not connect to the server');
             });
-    }
-
-    updateRequest() {
-        const name = this.state.name;
-        console.log('test');
-        const http = new XMLHttpRequest({mozSystem: true});
-        const url = 'http://localhost:5000/api/player-put/' + name;
-        http.open('PUT', url, true);
-        http.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-
-        const self = this;
-        http.onreadystatechange = function () {
-            if (http.readyState === 4 && http.status === 200) {
-                self.sendServerRequest(name);
-            }
-        }
-        http.send();
-
-        // res.header("Access-Control-Allow-Origin", "*");
-        // res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-        // next();
     }
 
     render() {
         return (
-            <div className="App">
-                <header className="App-header">
-                    <h1 className="App-title">
-                        Welcome
-                    </h1>
-                </header>
-                <SearchForm passAlong={(name) => this.handleFormChange(name)} />
-                <Player request={this.state.request} updateRequest={() => this.updateRequest()} />
+            <div className="container">
+                <Header formSubmitFn={name => { this.handleFormSubmit(name) }} />
+                <Main changeDay={number => { this.changeDay(number) }} status={this.state.status} />
             </div>
         );
     }
 }
 
+class Header extends Component {
+
+    render() {
+        return (
+            <header className="row">
+                <h1 className="column">flying-donkey</h1>
+                <SearchForm formSubmitFn={this.props.formSubmitFn} />
+            </header>
+        );
+    }
+}
+
 class SearchForm extends Component {
-    constructor(props) {
-        super(props);
+    constructor() {
+        super();
         this.state = { value: '' };
 
         this.handleChange = this.handleChange.bind(this);
@@ -125,49 +209,106 @@ class SearchForm extends Component {
 
     handleSubmit(event) {
         event.preventDefault();
-        this.props.passAlong(this.state.value);
+        this.props.formSubmitFn(this.state.value);
+        this.setState({ value: '' });
     }
 
     render() {
         return (
-            <form onSubmit={this.handleSubmit}>
-                <input type="text" value={this.state.value} onChange={this.handleChange} placeholder={'Give me a name'} />
-                <input type="submit" value="Search"></input>
-            </form>
+            <div className="column">
+                <form onSubmit={this.handleSubmit} className="container">
+                    <fieldset className="row">
+                        <input className="column" type="text" value={this.state.value} onChange={this.handleChange} placeholder={'Name...'} />
+
+                        <input className="column button-primary" type="submit" value="Search"></input>
+                    </fieldset>
+                </form>
+            </div>
         );
     }
 }
 
-class Player extends Component {
+class Main extends Component {
 
     render() {
+        return (
+            <main className="row">
+                <Content status={this.props.status} />
+                <ControlPanel changeDay={this.props.changeDay} status={this.props.status} />
+            </main>
+        );
+    }
+}
 
-        if (!this.props.request.resolved) {
-            if (!this.props.request.initiated) {
-                return (<p className="status-msg">Waiting for a searcherino</p>);
-            }
-            else {
-                return (<p className="status-msg">Please hang on...</p>);
-            }
+
+class Content extends Component {
+
+    render() {
+        console.log(this.props.status);
+
+        if (this.props.status.start) {
+            return (<p className="column">Try a search</p>);
+        }
+        else if (this.props.status.pending) {
+            return (<p className="column">Please wait...</p>)
+        }
+        else if (this.props.status.success) {
+            return <Tabl data={this.props.status.data} />
         }
         else {
-            if (this.props.request.success) {
-                return (
-                    <div>
-                        <SkillTable skills={this.props.request.data} />
-                        <a onClick={this.props.updateRequest}>Click to update</a>
-                    </div>
-                );
-            }
-            else {
-                return (<p className="status-msg">{this.props.request.errMsg}</p>);
-            }
+            return (<p className="column">{this.props.status.msg}</p>)
+        }
+
+    }
+}
+
+
+class ControlPanel extends Component {
+
+    render() {
+        if (!this.props.status.success) {
+            return (<p className="column"> :) </p>);
+
+        } else {
+            return (
+                <PeriodOptions changeDay={this.props.changeDay} />
+            );
         }
     }
 }
 
-class SkillTable extends Component {
+class PeriodOptions extends Component {
 
+    handleClick(number) {
+        this.props.changeDay(number);
+    }
+
+    render() {
+        return (
+            <div className="column">
+                <div className="container">
+                    <div className="row">
+                        <button onClick={() => this.handleClick(1)} className="button button-clear">Last day</button>
+                    </div>
+                    <div className="row">
+                        <button onClick={() => this.handleClick(7)} className="button button-clear" >Last week</button>
+                    </div>
+                    <div className="row">
+                        <button onClick={() => this.handleClick(31)} className="button button-clear" >Last month</button>
+                    </div>
+                    <div className="row">
+                        <button onClick={() => this.handleClick(365)} className="button button-clear" >Last year</button>
+                    </div>
+                    <div className="row">
+                        <button onClick={() => this.handleClick(0)} className="button button-outline" >Update!</button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+}
+
+class Tabl extends Component {
     getColorClass(number) {
         if (number < 0) {
             return 'green';
@@ -181,7 +322,7 @@ class SkillTable extends Component {
     }
 
     render() {
-        let skills = this.props.skills;
+        let skills = this.props.data;
 
         const data = Object.keys(skills).map(key => {
             const capitalized = key.charAt(0).toUpperCase() + key.slice(1);
@@ -196,21 +337,24 @@ class SkillTable extends Component {
             );
         });
         return (
-            <div>
-                <table className="App-table">
-                    <tbody>
+            <div className="column">
+                <table>
+                    <thead>
                         <tr>
                             <th>Skill</th>
                             <th>Level</th>
                             <th>XP</th>
                             <th>Rank</th>
                         </tr>
+                    </thead>
+                    <tbody>
                         {data}
                     </tbody>
                 </table>
-                <p className="status-msg">Showing gains for last 7 days</p>
+                <p className="status-msg">Showing gains?</p>
             </div>
         );
     }
 }
+
 export default App;

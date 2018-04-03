@@ -1,8 +1,15 @@
+const debug = false;
+
 const getRelevantDatapoints = (data, timePeriod, date, comparator) => {
-    const millis = date.getMilliseconds();
+
+    if (debug) {
+        console.log('Inside getRelevantDatapoints');
+    }
+
+    const millis = daysToMilliseconds(timePeriod);
 
     const relevantDatapoints = data.datapoints.filter(datapoint => {
-        return comparator(datapoint.date, now - millis);
+        return comparator(datapoint.date, date - millis);
     });
     return relevantDatapoints;
 }
@@ -16,28 +23,35 @@ const gt = (a, b) => {
 }
 
 const calculateProgress = function (data, timePeriod) {
+    if (debug) {
+        console.log('Inside calculateProgress');
+    }
     const now = new Date();
 
     const within = getRelevantDatapoints(data, timePeriod, now, gt);
     const outside = getRelevantDatapoints(data, timePeriod, now, lt);
 
-    if (datapointsOutsideTimePeriod.length === 0) {
+    if (outside.length === 0) {
         // Calc stoof
-        const first = datapointsWithinTimePeriod.shift();
-        const last = datapointsWithinTimePeriod.pop();
+        const first = within.shift();
+        const last = within.pop();
         const diff = difference(first.skills, last.skills)
         return diff;
     }
     else {
         // Calc stoooffs
-        const first = datapointsOutsideTimePeriod.pop();
-        const last = datapointsWithinTimePeriod.pop();
+        const first = outside.pop();
+        const last = inside.pop();
         const diff = difference(first.skills, last.skills)
         return diff;
     }
 }
 
 const difference = (first, last) => {
+
+    if (debug) {
+        console.log('inside difference');
+    }
     let mutable = JSON.parse(JSON.stringify(last));
 
     for (const key in last) {
@@ -49,14 +63,23 @@ const difference = (first, last) => {
 }
 
 const hasDatapoints = (data) => {
+    if (debug) {
+        console.log('inside hasDatapoints');
+    }
     return data.datapoints.length > 1;
 }
 
 const hasDatapointsWithinPeriod = (data, period, date) => {
-    const result = hasDatapointsWithinPeriod(data, period, date, gt);
+    if (debug) {
+        console.log('inside hasDatapointsWithinPeriod');
+    }
+    const result = getRelevantDatapoints(data, period, date, gt);
     return result.length !== 0;
 }
 
+const daysToMilliseconds = days => {
+    return days * 24 * 60 * 60 * 1000;
+}
 module.exports.calculateProgress = calculateProgress;
 module.exports.hasDatapointsWithinPeriod = hasDatapointsWithinPeriod;
 module.exports.hasDatapoints = hasDatapoints;
