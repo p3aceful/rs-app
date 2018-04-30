@@ -1,6 +1,6 @@
 const MongoClient = require('mongodb').MongoClient;
 
-const url = 'mongodb://localhost:27017/runescape';
+const url = 'mongodb://localhost:27017/deleteme';
 const databaseName = 'deleteme';
 const collectionName = 'players';
 

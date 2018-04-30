@@ -5,3 +5,14 @@
 .red {
     color: red;
 }
+
+.error {
+    border: 1px solid red;
+}
+
+header {
+    background-color: honeydew;
+}
+main {
+    background-color: floralwhite;
+}

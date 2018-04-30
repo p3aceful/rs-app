@@ -33,6 +33,11 @@ const calculateProgress = function (data, timePeriod) {
 
     if (outside.length === 0) {
         // Calc stoof
+        if (within.length === 1) {
+            const only = within.pop();
+            const diff = difference(only.skills, only.skills)
+            return diff;
+        }
         const first = within.shift();
         const last = within.pop();
         const diff = difference(first.skills, last.skills)
@@ -41,7 +46,7 @@ const calculateProgress = function (data, timePeriod) {
     else {
         // Calc stoooffs
         const first = outside.pop();
-        const last = inside.pop();
+        const last = within.pop();
         const diff = difference(first.skills, last.skills)
         return diff;
     }
@@ -77,9 +82,15 @@ const hasDatapointsWithinPeriod = (data, period, date) => {
     return result.length !== 0;
 }
 
+const getNumberOfDatapointsWithinPeriod = (data, period, date) => {
+    const result = getRelevantDatapoints(data, period, date, gt);
+    return result.length;
+}
+
 const daysToMilliseconds = days => {
     return days * 24 * 60 * 60 * 1000;
 }
 module.exports.calculateProgress = calculateProgress;
 module.exports.hasDatapointsWithinPeriod = hasDatapointsWithinPeriod;
 module.exports.hasDatapoints = hasDatapoints;
+module.exports.getNumberOfDatapointsWithinPeriod= getNumberOfDatapointsWithinPeriod;

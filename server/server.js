@@ -3,7 +3,7 @@ const ProgressCalculator = require('./ProgressCalculator.js');
 const RuneScape = require('./runescapeApiRequests.js');
 const express = require('express');
 
-const serverURL = 'mongodb://localhost:27017/runescape';
+const serverURL = 'mongodb://localhost:27017/deleteme';
 
 const app = express();
 const port = 5000;
@@ -22,6 +22,7 @@ Mongo.connect(serverURL)
         app.get('/api/player/:name', async (req, res) => {
             try {
                 const playerName = trimText(req.params.name);
+
                 const query = req.query;
                 const now = new Date();
 
@@ -46,21 +47,22 @@ Mongo.connect(serverURL)
                     res.json(msg);
                 } else {
 
-                    if (!ProgressCalculator.hasDatapoints(result)) {
-                        const msg = createResponseMessage('This player does not have enough datapoints to process.');
-                        res.status(400);
+                    const dpLength = ProgressCalculator.getNumberOfDatapointsWithinPeriod(result, query.period, now);
+
+                    if (dpLength === 0) {
+                        const msg = createResponseMessage('The player does not have enough datapoints within this period.');
+                        res.status(200);
                         res.json(msg);
                         return;
                     }
 
-                    console.log('Checking if player has enough datapoints within the period to process:');
-                    if (!ProgressCalculator.hasDatapointsWithinPeriod(result, query.period, now)) {
-                        const msg = createResponseMessage('This player does not have enough datapoints in this period to process');
-                        res.status(400);
+                    if (dpLength === 1) {
+                        const progress = ProgressCalculator.calculateProgress(result, query.period);
+                        const msg = createResponseMessage('The player only have one datapoint within this period.', progress);
+                        res.status(200);
                         res.json(msg);
                         return;
                     }
-                    console.log('It did!');
 
                     const progress = ProgressCalculator.calculateProgress(result, query.period);
                     const msg = createResponseMessage('OK', progress);
@@ -85,8 +87,8 @@ Mongo.connect(serverURL)
                 );
 
                 if (fromHiscores === null) {
-                    const msg = createResponseMessage('Player does not exist');
-                    res.status(400);
+                    const msg = createResponseMessage('Player does not exist.');
+                    res.status(404);
                     res.json(msg);
                     return;
                 }
@@ -95,26 +97,38 @@ Mongo.connect(serverURL)
                     // Player not exist, make a new.
                     const entry = createNewEntry(playerName, fromHiscores);
                     const result = await Mongo.insertNewPlayer(playerName, entry, conn);
+                    const progress = ProgressCalculator.calculateProgress(entry, 7);
 
-                    const msg = createResponseMessage('Started tracking player: ' + playerName, entry);
+                    const msg = createResponseMessage('Started tracking player: ' + playerName, progress);
                     res.json(msg);
                     return;
                 }
                 else {
                     // Player exists, append new datapoint.
+
+                    // Reject if last datapoint is less than 1 minute old.
+                    if (hasBeenUpdatedLastMinute(fromDb)) {
+                        const msg = createResponseMessage('Player has already been updated less than 1 minute ago. Please wait. Dont overload server. It makes server very sad.');
+                        res.status(429);
+                        res.json(msg);
+                        return;
+                    }
+                    // TODO: CHECK IF PROGRESS IS UNCHANGED SINCE LAST POINT? NO NEED TO CREATE NEW POINT IN THAT CASE? JUST UPDATE DATE ON OLD OR SMTH
                     const appended = appendDatapointToExistingPlayerFromDB(fromDb, fromHiscores);
 
                     const result = await Mongo.updatePlayerEntry(playerName, appended, conn);
 
-                    const responseData = await Mongo.getPlayerData(playerName, conn); // ???
+                    const playerData = await Mongo.getPlayerData(playerName, conn); // ???
 
-                    const msg = createResponseMessage('Added 1 datapoint to player: ' + playerName, responseData);
+                    const progress = ProgressCalculator.calculateProgress(playerData, 7);
+
+                    const msg = createResponseMessage('Added 1 datapoint to player: ' + playerName, progress);
                     res.json(msg);
                     return;
                 }
             } catch (error) {
                 console.log(error);
-                const msg = createResponseMessage('Server error');
+                const msg = createResponseMessage('Server error.');
                 res.status(500);
                 res.json(msg);
             }
@@ -152,4 +166,11 @@ const appendDatapointToExistingPlayerFromDB = (playerEntryFromDb, datapointSkill
     const datapoint = { date: now, skills: datapointSkills };
     datapoints.push(datapoint);
     return datapoints;
+}
+
+const hasBeenUpdatedLastMinute = player => {
+    const now = new Date();
+    const lastDatapoint = player.datapoints[player.datapoints.length - 1];
+
+    return lastDatapoint.date.getTime() > now.getTime() - (60 * 1000);
 }
