@@ -4,17 +4,17 @@
   "description": "This is a little app working with the runescape API to track player stats",
   "main": "index.js",
   "scripts": {
-    "start": "nodemon ./server/server.js"
+    "start": "node ./server/server.js"
   },
   "author": "Fredrik Carlsen",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.16.3",
-    "milligram": "^1.3.0",
-    "mongodb": "^3.0.5",
-    "node-fetch": "^2.1.2"
+    "express": "^4.16.4",
+    "mongodb": "^3.1.13",
+    "request": "^2.88.0",
+    "request-promise": "^4.2.4"
   },
   "devDependencies": {
-    "nodemon": "^1.17.2"
+    "nodemon": "^1.18.10"
   }
 }
