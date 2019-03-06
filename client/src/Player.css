@@ -1,0 +1,29 @@
+.statPageContainer {
+    height: 100vh;
+    display: grid;
+}
+
+.green {
+    color: green;
+}
+
+.red {
+    color: red;
+}
+
+.capitallize:first-letter {
+    text-transform:capitalize;
+}
+
+.fade {
+    background: rgba(102, 52, 153, 0.2);
+}
+
+.non-fade {
+    background: rgba(102, 52, 153, 0.5);
+
+}
+
+.active {
+    background: teal;
+}
